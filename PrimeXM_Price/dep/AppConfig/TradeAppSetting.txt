@@ -1,0 +1,6 @@
+ManagerIP=185.17.144.162:443
+ManagerLogin=1000
+ManagerPassword=6xqwsdqgr2
+FixSetting=.\FIXSetting\TradeSettings.cfg
+MonitorPort=7502
+ManagerLibInclude=.\include\API\Manager
