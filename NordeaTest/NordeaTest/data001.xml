@@ -1,0 +1,32 @@
+<expressions>
+	<addition id="1">
+		<item>2</item>
+		<item>3</item>
+		<item>4</item>
+		<item>
+			<subtraction>
+				<minuend>3</minuend>
+				<subtrahend>2</subtrahend>
+			</subtraction>
+		</item>
+	</addition>
+	<subtraction id="2">
+		<minuend>3</minuend>
+		<subtrahend>2</subtrahend>
+	</subtraction>
+	<multiplication id="3">
+		<factor>5</factor>
+		<factor>6</factor>
+		<factor>8</factor>
+		<factor>
+			<subtraction>
+				<minuend>3</minuend>
+				<subtrahend>1</subtrahend>
+			</subtraction>
+		</factor>
+	</multiplication>
+	<division id="4">
+		<dividend>54</dividend>
+		<divisor>9</divisor>
+	</division>
+</expressions>
