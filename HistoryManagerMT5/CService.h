@@ -7,30 +7,17 @@
 #include <atlbase.h>
 #include <tchar.h>
 
-#include "quickfix/FileStore.h"
-#include "quickfix/ThreadedSocketAcceptor.h"
-#include "quickfix/Log.h"
-#include "quickfix/SessionSettings.h"
-#include "quickfix/FileLog.h"
-#include "Application.h"
+#include "Manager.h"
 #include <string>
 #include <iostream>
 #include <fstream>
-#include "AppStart.h"
+//#include "AppStart.h"
 
-TCHAR* serviceName = TEXT("HERA-FX FIXPrice1");
+TCHAR* serviceName = TEXT("JSON Pricefeed");
 SERVICE_STATUS serviceStatus;
 SERVICE_STATUS_HANDLE serviceStatusHandle = 0;
 HANDLE stopServiceEvent = 0;
 
-void wait()
-{
-	//std::cout << "Type Ctrl-C to quit" << std::endl;
-	while (true)
-	{
-		FIX::process_sleep(1);
-	}
-}
 
 void WINAPI ServiceControlHandler(DWORD controlCode)
 {
@@ -84,25 +71,30 @@ void WINAPI ServiceMain(DWORD /*argc*/, TCHAR* /*argv*/[])
 		serviceStatus.dwCurrentState = SERVICE_START_PENDING;
 		SetServiceStatus(serviceStatusHandle, &serviceStatus);
 		// do initialisation here
+		Manager *manager;
 		stopServiceEvent = CreateEvent(0, FALSE, FALSE, 0);
-		static FIXR::AppStart *App;
-		static FIX::SessionSettings *ptr_settings;
-		static FIX::FileStoreFactory *ptr_storeFactory;
-		static FIX::FileLogFactory *ptr_logFactory;
-		static Application *ptr_application;
-		static FIX::ThreadedSocketAcceptor *acceptor;
+		// declaration
 
 		if (serviceStatus.dwCurrentState == SERVICE_START_PENDING)
 		{
-			App = new FIXR::AppStart();
-			ptr_settings = new FIX::SessionSettings(App->FixSetting());
-			ptr_storeFactory = new FIX::FileStoreFactory(*ptr_settings);
-			ptr_logFactory = new FIX::FileLogFactory(*ptr_settings);
-			ptr_application = new Application(App->ManagerIP(), App->ManagerLogin(), App->ManagerPassword(), *ptr_settings);
-			if (App->FileLogRequired() == "N")
-				acceptor = new FIX::ThreadedSocketAcceptor(*ptr_application, *ptr_storeFactory, *ptr_settings);
-			else if (App->FileLogRequired() == "Y")
-				acceptor = new FIX::ThreadedSocketAcceptor(*ptr_application, *ptr_storeFactory, *ptr_settings,*ptr_logFactory);			
+			// initialization	
+			std::vector<std::wstring> va{ boost::nowide::widen("HistoryManager64.exe"),
+				boost::nowide::widen("/server:188.72.227.210:443"),
+				boost::nowide::widen("/login:1005"),
+				boost::nowide::widen("/password:trt487598"),
+				boost::nowide::widen("/port:25500")
+			};
+
+
+			const wchar_t* argv1[5] = { va[0].c_str(),
+				va[1].c_str(),
+				va[2].c_str(),
+				va[3].c_str(),
+				va[4].c_str()
+			};
+			manager = new Manager(5, argv1);
+			if (manager->createManagerInterface() != MT_RET_OK)
+				goto stop_service;
 		}
 
 		// running
@@ -111,9 +103,10 @@ void WINAPI ServiceMain(DWORD /*argc*/, TCHAR* /*argv*/[])
 		SetServiceStatus(serviceStatusHandle, &serviceStatus);
 		if (serviceStatus.dwCurrentState == SERVICE_RUNNING)
 		{
+			// server running			
 			try
-			{				
-				acceptor->start();
+			{
+				manager->StartWS();
 			}
 			catch (...)
 			{
@@ -136,7 +129,8 @@ void WINAPI ServiceMain(DWORD /*argc*/, TCHAR* /*argv*/[])
 		{	
 			try
 			{
-				acceptor->stop();
+				// stopping service
+				manager->StopWS();
 			}
 			catch (...)
 			{
@@ -178,6 +172,7 @@ void InstallService()
 	if (serviceControlManager)
 	{
 		TCHAR path[_MAX_PATH + 1];
+		std::cout << "service control manager" << std::endl;
 
 		if (GetModuleFileName(0, path, sizeof(path) / sizeof(path[0])) > 0)
 		{
@@ -186,6 +181,7 @@ void InstallService()
 				SERVICE_ALL_ACCESS, SERVICE_WIN32_OWN_PROCESS,
 				SERVICE_AUTO_START, SERVICE_ERROR_IGNORE, path,
 				0, 0, 0, 0, 0);
+			std::cout << "create service" <<service << std::endl;
 			if (service)
 				CloseServiceHandle(service);
 		}
@@ -202,12 +198,14 @@ void UninstallService()
 	{
 		SC_HANDLE service = OpenService(serviceControlManager,
 			serviceName, SERVICE_QUERY_STATUS | DELETE);
+		std::cout << "open service" << std::endl;
 		if (service)
 		{
 			SERVICE_STATUS serviceStatus;
 			if (QueryServiceStatus(service, &serviceStatus))
 			{
-				if (serviceStatus.dwCurrentState == SERVICE_STOPPED)
+				std::cout << "delete" << std::endl;
+				if ((serviceStatus.dwCurrentState == SERVICE_STOPPED)|| (serviceStatus.dwCurrentState == SERVICE_STOP_PENDING))//SERVICE_STOP_PENDING
 					DeleteService(service);
 			}
 
